@@ -12,7 +12,7 @@ import sys
 from abr.abr_parser import ABRBrushParser
 from kpp.kpp_brush_parser import KPP_Brush_Parser
 from kpp.krita_resource_bundle_creator import KritaResourceBundleCreator
-from kpp.paintop_preset import TextureBlendingModePixelEngine, BrushTipType, BlendingMode, SensorId
+from kpp.paintop_preset import TextureBlendingModePixelEngine, BrushTipType, BlendingMode, SensorId, Curve
 
 from math import radians
 
@@ -360,10 +360,23 @@ class ABRBrushConverter:
                                     self.writer.setBrushDefinitionSetting('diameter', value2)
                             case 'Hrdn': # Hardness
                                 if type == 'computedBrush':
-                                    value = 100 - value2
-                                    self.saveSetting('hFade', value)
-                                    self.saveSetting('vFade', value)
-                                    self.saveSetting('softnessCurve', f"0,0;1,{value}") # or something
+                                    # value2 is already normalized to a 0-1
+                                    # fraction by getValueFromKey (it divides
+                                    # #Prc units by 100), so the fade amount
+                                    # is simply the complement, also 0-1 -
+                                    # NOT "100 - value2" (that treated an
+                                    # already-normalized 0-1 value as if it
+                                    # were still on a 0-100 scale).
+                                    fade = 1 - value2
+                                    # hFade/vFade/softnessCurve live on the
+                                    # brush tip's MaskGenerator, not the
+                                    # paintop's top-level settings, so this
+                                    # must go through setBrushDefinitionSetting
+                                    # (saveSetting routes to the wrong place
+                                    # and the value was silently dropped).
+                                    self.writer.setBrushDefinitionSetting('hFade', fade)
+                                    self.writer.setBrushDefinitionSetting('vFade', fade)
+                                    self.writer.setBrushDefinitionSetting('softnessCurve', Curve(f"0,0;1,{fade}"))
                             case 'Angl': # Angle
                                 self.writer.setBrushDefinitionSetting('angle', value2)
                             case 'Rndn': # Roundness

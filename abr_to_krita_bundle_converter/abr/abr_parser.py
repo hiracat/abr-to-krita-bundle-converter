@@ -457,8 +457,19 @@ class ABRBrushParser:
     def readImageData(self, f, compression, depth, width, height, invert):
         imgData = []
 
-        if depth != 8:
-            print("Found bitdepth other than 8, please implement it")
+        if depth not in (8, 16):
+            print(f"Found bitdepth {depth}, please implement it")
+
+        # Guard against a previous parsing desync turning into a
+        # multi-gigabyte read (width/height can come out negative or
+        # absurdly large if an earlier field was misread).
+        if width <= 0 or height <= 0 or width * max(depth, 8) // 8 * height > 500_000_000:
+            raise ValueError(
+                f"Refusing to read image data with implausible dimensions "
+                f"width={width} height={height} depth={depth} (likely a parser desync)")
+
+        bytesPerPixel = max(1, depth // 8)
+        rowBytes = width * bytesPerPixel
 
         if compression == 1: # RLE
             rowLens = []
@@ -476,32 +487,33 @@ class ABRBrushParser:
                         continue
                     if amount < 0: # uncompress run ('backward')
                         byte = f.read(1)
-                        if invert:
-                            byte = (byte[0] ^ 0xff).to_bytes(1, 'big')
                         rowData += byte * (-amount+1)
                         rowLen -= 1
                     else: # read ('forward')
                         for _ in range(amount+1):
                             byte = f.read(1)
-                            if invert:
-                                byte = (byte[0] ^ 0xff).to_bytes(1, 'big')
                             rowData += byte
                             rowLen -= 1
                 imgData.append(rowData)
         else: # uncompressed
-            #imgData = f.read(width*height)
             for _ in range(height):
-                bytes = f.read(width)
-                if invert:
-                    bytes = bytearray(bytes)
-                    for i in range(len(bytes)):
-                        bytes[i] = bytes[i] ^ 0xff
-                imgData.append(bytes)
+                rowData = f.read(rowBytes)
+                imgData.append(bytearray(rowData))
+
+        # Downsample >8-bit depths to 8-bit (take the most significant byte
+        # of each big-endian pixel), since the rest of the pipeline (PNG
+        # writer, GBR export) only speaks 8-bit grayscale.
+        if bytesPerPixel > 1:
+            imgData = [row[0::bytesPerPixel] for row in imgData]
+
+        if invert:
+            for row in imgData:
+                for i in range(len(row)):
+                    row[i] ^= 0xff
 
         #print(f"found {len(imgData)} bytes of data out of {width*height}")
 
         return imgData
-
 
     def dumpImageTga(self, imgData, brushUuid, width, height):
         with open(self.dumpImagesPath+str(brushUuid)+".tga", 'wb') as f:
