@@ -1,6 +1,20 @@
 # ABR to Krita Bundle Converter
 
+The reason why this is forked is because the original crashes when dealing with 16 bit files. 
+I got claude to fix it and plan on making further improvements, either by hand or with AI either assistance or primarily.
+It works with them now. 
+Some other things are still broken. Please open issues with brushes which dont behave the way you expect them to.
+Thumbnails dont exist. .abr files dont include them, so the krita ends up with a white thumbnail.
+
+Brush engines besides pixel are not supported.
+Having brush fields vary with anything besides pressure doesnt work.
+Custom curves for brush fields also doesnt work.
+
+
+
+
 Convert Photoshop `.abr` brush files into Krita resource bundles (`.bundle`).
+This does not need to be run as a krita plugin and can be easily run standalone. I forget how and am not putting directions. but directions do exist in the freyalupen original brush converter repo. 
 
 ## Installation
 
